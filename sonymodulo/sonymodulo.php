@@ -1,6 +1,6 @@
 <?php 
 if(!defined('_PS_VERSION_'))
-exit;
+    exit;
 
 Class SonyModulo extends Module
 {
@@ -14,21 +14,47 @@ Class SonyModulo extends Module
         $this->controllers = array('default');
         $this->bootstrap = 1;
         parent::__construct();
-	}
+    }
 
   public function install()//instala
-    {
-        if( !parent::install() || !$this->registerHook('displayHome'))//en que hook insertamos el modulo 
-            return false;
-        return true;
-    }
+  {
+    if( !parent::install() || 
+        !$this->registerHook('displayHome') ||
+        !$this->registerHook('displayHeader') ||
+        !$this->instalarModulo()
+        )//en que hook insertamos el modulo 
+        return false;
+    return true;
+}
 
- public function uninstall()
-    {
-        if( !parent::uninstall() || !$this->unregisterHook('displayHome'))
-            return false;
-        return true;
-    }
+public function uninstall()
+{
+    if( !parent::uninstall() ||
+     !$this->unregisterHook('displayHome') ||
+     !$this->unregisterHook('displayHeader') ||
+     !$this->desinstalarModulo()
+ )
+        return false;
+    return true;
+}
+public function instalarModulo(){
+      $langs = Language::getLanguages();//obtenemos array con los lenguajes disponibles
+      foreach ($langs as $lang) {
+       $id = $lang['id_lang'];
+       $texto = $this->l('Texto Predeterminado');
+       Configuration::updateValue('SONY_MODULO_TEXTO_HOME_'.$id, $texto);
+   }
+   return true;
+}
+
+public function desinstalarModulo(){
+      $langs = Language::getLanguages();//obtenemos array con los lenguajes disponibles
+      foreach ($langs as $lang) {
+          $id = $lang['id_lang'];
+          Configuration::deleteByName('SONY_MODULO_TEXTO_HOME_'.$id);
+      }
+      return true;
+  }
 
     public function getContent()//configuración del módulo
     {
@@ -49,52 +75,73 @@ Class SonyModulo extends Module
         $helper->title = $this->displayName;
 
         $helper->submit_action = 'sonymodulo';
-        $helper->fields_value['texto'] = Configuration::get('SONY_MODULO_TEXTO_HOME');
-        
-        $this->form[0] = array(
-            'form' => array(
-                'legend' => array(
-                    'title' => $this->displayName
-                 ),
-                'input' => array(
-                    array(
-                        'type' => 'text',
-                        'label' => $this->l('Texto'),
-                        'desc' => $this->l('Qué texto quieres que aparezca en la página de inicio'),
-                        'hint' => $this->l('Pista'),
-                        'name' => 'texto',//unico siempre
-                        'lang' => false,
-                     ),
-                 ),
-                'submit' => array(
-                    'title' => $this->l('Save')
-                 )
-             )
-         );
-        return $helper->generateForm($this->form);
-    }
-   public function postProcess()
-    {
-        if(Tools::isSubmit('sonymodulo')) {
-            $texto = Tools::getValue('texto');
-            Configuration::updateValue('SONY_MODULO_TEXTO_HOME', $texto);
-            return $this->displayConfirmation($this->l('Updated Successfully'));
-        }
-    }
+        $langs = Language::getLanguages();//obtenemos array con los lenguajes disponibles
+        foreach ($langs as $lang) {
+           $id = $lang['id_lang'];
+           $helper->fields_value['texto'][$id] = Configuration::get('SONY_MODULO_TEXTO_HOME_'.$id);
+       }
 
-    public function hookDisplayHome($params)
-    {
-         $texto = Configuration::get('SONY_MODULO_TEXTO_HOME');
+
+       $this->form[0] = array(
+        'form' => array(
+            'legend' => array(
+                'title' => $this->displayName
+            ),
+            'input' => array(
+                array(
+                    'type' => 'text',
+                    'label' => $this->l('Texto'),
+                    'desc' => $this->l('Qué texto quieres que aparezca en la página de inicio'),
+                    'hint' => $this->l('Pista'),
+                        'name' => 'texto',//unico siempre
+                        'lang' => true,
+                    ),
+            ),
+            'submit' => array(
+                'title' => $this->l('Save')
+            )
+        )
+    );
+       return $helper->generateForm($this->form);
+   }
+   public function postProcess()
+   {
+    if(Tools::isSubmit('sonymodulo')) {
+
+              $langs = Language::getLanguages();//obtenemos array con los lenguajes disponibles
+              foreach ($langs as $lang) {
+               $id = $lang['id_lang'];
+               $texto = Tools::getValue('texto_'.$id);
+               Configuration::updateValue('SONY_MODULO_TEXTO_HOME_'.$id, $texto);
+           }
+
+           return $this->displayConfirmation($this->l('Updated Successfully'));
+       }
+   }
+
+   public function hookDisplayHome($params)
+   {
+        /*print_r($this->context->language);*///par ver contexto
+        $id = $this->context->language->id;
+        $texto = Configuration::get('SONY_MODULO_TEXTO_HOME_'.$id);
         $this->context->smarty->assign(array(
             'texto_variable' => $texto,
         ));
-       
+
         return $this->context->smarty->fetch($this->local_path.'views/templates/hook/home.tpl');
     }
     
-
+    public function hookDisplayHeader($params)
+    {
+        if($this->context->controller->php_self && $this->context->controller->php_self == 'index')
+        {
+         $this->context->controller->addCSS($this->local_path.'views/css/style.css');
+          $this->context->controller->addJS($this->local_path.'views/js/script.js');
+        }
+       
+    }
     
 }
 
 
- ?>
+?>
